@@ -68,6 +68,7 @@ import argparse
 import csv
 import json
 import os
+import random
 import sys
 import time
 import xml.etree.ElementTree as ET
@@ -235,17 +236,42 @@ def submit_url(session, url, verbose=True):
     return resp.status_code, resp.text
 
 
-def build_round_robin_queue(per_site_pending, daily_quota):
+def build_round_robin_queue(per_site_pending, daily_quota, seed=None):
     """
     per_site_pending: dict site_name -> deque of URLs not yet submitted.
     Returns a flat list of (site_name, url), fairly interleaved, capped at
     daily_quota, skipping sites whose queue has run dry.
+
+    Round 1 (the first URL for every site) always runs in stable CSV order,
+    so the "1 guaranteed URL per site" behavior is predictable and complete.
+
+    Every round AFTER that (the "bonus" slots that go to sites with bigger
+    backlogs, once every site's first URL is already queued) is shuffled
+    using a seed that changes daily by default. Without this, any leftover
+    quota beyond 1-per-site would always go to whichever sites happen to
+    sit first in sites_config.csv -- meaning a handful of sites near the
+    top of the file would perpetually get extra submissions while sites
+    near the bottom never would, even if they have larger backlogs. With
+    the daily-seeded shuffle, which sites get the bonus slots rotates
+    fairly over time.
+
+    seed: pass an explicit value for reproducible/testable output. If None,
+    defaults to today's date, so the shuffle is stable within a single day
+    (helpful if the script is re-run) but different from day to day.
     """
+    rng = random.Random(seed if seed is not None else datetime.now(timezone.utc).date().isoformat())
+
     queues = {name: deque(urls) for name, urls in per_site_pending.items() if urls}
-    order = list(queues.keys())
+    order = list(queues.keys())  # round 1: stable CSV order, guarantees fairness of the FIRST slot
     result = []
+    first_round = True
 
     while order and len(result) < daily_quota:
+        if not first_round:
+            order = order[:]  # copy before shuffling so we don't mutate anything unexpected
+            rng.shuffle(order)
+        first_round = False
+
         next_order = []
         for name in order:
             if len(result) >= daily_quota:
