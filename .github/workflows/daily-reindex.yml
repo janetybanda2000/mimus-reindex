@@ -1,0 +1,56 @@
+name: Daily Google Indexing Submission
+
+on:
+  schedule:
+    # Runs at 04:00 UTC every day. Adjust as you like.
+    - cron: "0 4 * * *"
+  workflow_dispatch: {}   # lets you also trigger it manually from the Actions tab
+
+permissions:
+  contents: write   # needed so the workflow can commit the updated state file back
+
+jobs:
+  reindex:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt --break-system-packages
+
+      - name: Write service account key from secret
+        run: echo '${{ secrets.GOOGLE_INDEXING_KEY }}' > service-account.json
+
+      - name: Run daily reindex
+        run: |
+          python3 bulk_reindex.py \
+            --key service-account.json \
+            --sites-config sites_config.csv \
+            --daily-quota 190 \
+            --quiet
+
+      - name: Remove service account key (never leave it on disk)
+        if: always()
+        run: rm -f service-account.json
+
+      - name: Upload this run's log as an artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reindex-log-${{ github.run_number }}
+          path: reindex_log.csv
+
+      - name: Commit updated state file back to repo
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/state.json
+          git diff --staged --quiet || git commit -m "Update indexing state [skip ci]"
+          git push
