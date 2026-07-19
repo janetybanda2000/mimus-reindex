@@ -1,4 +1,16 @@
 {
+  "https://afghanistan.mimusjobs.com/job/senior-project-manager-kabul-operations/": {
+    "result": "success",
+    "site": "Afghanistan",
+    "status": 200,
+    "timestamp": "2026-07-19T14:45:38.629823+00:00"
+  },
+  "https://albania.mimusjobs.com/job/real-estate-sales/": {
+    "result": "success",
+    "site": "Albania",
+    "status": 200,
+    "timestamp": "2026-07-19T14:45:40.054536+00:00"
+  },
   "https://algeria.mimusjobs.com/job/agent-dentretien-femme-5/": {
     "result": "success",
     "site": "Algeria",
