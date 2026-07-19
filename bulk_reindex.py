@@ -165,8 +165,45 @@ def save_state(path, state):
 
 
 def get_session(key_path):
-    creds = service_account.Credentials.from_service_account_file(key_path, scopes=SCOPES)
-    return AuthorizedSession(creds)
+    print(f"\n{CYAN}{'=' * 70}{RESET}")
+    print(f"{CYAN}AUTHENTICATING WITH GOOGLE{RESET}")
+    print(f"{CYAN}{'=' * 70}{RESET}")
+
+    if not os.path.exists(key_path):
+        print(f"{RED}Key file not found at: {key_path}{RESET}")
+        print(f"{RED}Check that the GOOGLE_INDEXING_KEY secret was written correctly, "
+              f"or that --key points to the right path.{RESET}")
+        sys.exit(1)
+
+    print(f"  Reading key file: {key_path}")
+
+    try:
+        with open(key_path, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+    except Exception as e:
+        print(f"{RED}  Could not parse key file as JSON: {e}{RESET}")
+        print(f"{RED}  This usually means the secret wasn't written correctly "
+              f"(e.g. quoting issue when echoing it to a file).{RESET}")
+        sys.exit(1)
+
+    # Only print non-secret identifying fields. NEVER print private_key.
+    client_email = raw.get("client_email", "unknown")
+    project_id = raw.get("project_id", "unknown")
+    print(f"  Key file parsed successfully.")
+    print(f"  Service account email: {GREEN}{client_email}{RESET}")
+    print(f"  Google Cloud project:  {project_id}")
+
+    try:
+        creds = service_account.Credentials.from_service_account_file(key_path, scopes=SCOPES)
+        session = AuthorizedSession(creds)
+    except Exception as e:
+        print(f"{RED}  Failed to build authenticated session: {e}{RESET}")
+        sys.exit(1)
+
+    print(f"{GREEN}  Authenticated session created successfully.{RESET}")
+    print(f"{CYAN}{'=' * 70}{RESET}\n")
+
+    return session
 
 
 def submit_url(session, url, verbose=True):
@@ -242,6 +279,13 @@ def main():
         sys.exit(1)
     print(f"{CYAN}Loaded {len(sites)} site(s) from {args.sites_config}.{RESET}")
 
+    # Authenticate FIRST, before spending time fetching 184 sitemaps --
+    # if the key is bad, you find out in seconds instead of after a long wait.
+    # Skipped for --dry-run since no submission will happen anyway.
+    session = None
+    if not args.dry_run:
+        session = get_session(args.key)
+
     state = load_state(args.state)
 
     # ---- Discover pending (never-submitted-successfully) URLs per site ----
@@ -276,8 +320,6 @@ def main():
     if not queue:
         print(f"{GREEN}Nothing to submit -- all sites are fully caught up.{RESET}")
         return
-
-    session = get_session(args.key)
 
     log_rows = []
     success_count = 0
