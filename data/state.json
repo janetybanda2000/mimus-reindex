@@ -191,6 +191,12 @@
     "status": 200,
     "timestamp": "2026-07-26T10:39:46.853880+00:00"
   },
+  "https://afghanistan.mimusjobs.com/job/senior-project-manager-afghanistan-operations-kabul/": {
+    "result": "success",
+    "site": "Afghanistan",
+    "status": 200,
+    "timestamp": "2026-08-15T05:18:22.588104+00:00"
+  },
   "https://afghanistan.mimusjobs.com/job/senior-project-manager-kabul-afghanistan/": {
     "result": "success",
     "site": "Afghanistan",
